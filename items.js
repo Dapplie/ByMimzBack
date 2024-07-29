@@ -124,6 +124,68 @@ app.post('/api/signin', async (req, res) => {
 });
 
 
+
+
+const CartSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  items: [
+      {
+          productId: { type: String, required: true },
+          name: { type: String, required: true },
+          price: { type: Number, required: true },
+          quantity: { type: Number, required: true, default: 1 }
+      }
+  ]
+});
+const Cart = mongoose.model('Cart', CartSchema);
+
+
+// Add to cart route
+app.post('/api/cart', async (req, res) => {
+  const { userId, productId, name, price, quantity } = req.body;
+  try {
+    let cart = await Cart.findOne({ userId });
+    if (cart) {
+      const itemIndex = cart.items.findIndex(item => item.productId === productId);
+      if (itemIndex > -1) {
+        let productItem = cart.items[itemIndex];
+        productItem.quantity += quantity;
+        cart.items[itemIndex] = productItem;
+      } else {
+        cart.items.push({ productId, name, price, quantity });
+      }
+      cart = await cart.save();
+      return res.status(201).send(cart);
+    } else {
+      const newCart = await Cart.create({
+        userId,
+        items: [{ productId, name, price, quantity }]
+      });
+      return res.status(201).send(newCart);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Something went wrong');
+  }
+});
+
+// View cart route
+app.get('/api/cart/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const cart = await Cart.findOne({ userId });
+    if (cart) {
+      res.json(cart);
+    } else {
+      res.status(404).send('Cart not found');
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Something went wrong');
+  }
+});
+
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
