@@ -126,43 +126,56 @@ app.post('/api/signin', async (req, res) => {
 
 
 
-// cart schema and model
-const myCartSchema = new mongoose.Schema({
-  userId: String,
-  name: String,
-  description: String,
-  price: Number,
-  type: String,
-});
+// // cart schema and model
+// const myCartSchema = new mongoose.Schema({
+//   userId: String,
+//   name: String,
+//   description: String,
+//   price: Number,
+//   type: String,
+// });
 
-// cart route
-app.post('/api/add_my_Cart', async (req, res) => {
-  const { userId, name, description, price, type } = req.body;
+// // cart route
+// app.post('/api/add_my_Cart', async (req, res) => {
+//   const { userId, name, description, price, type } = req.body;
 
-  // Create a new instance of the myCart model
-  const newCartItem = new myCart({
-    userId,
-    name,
-    description,
-    price,
-    type
-  });
+//   // Create a new instance of the myCart model
+//   const newCartItem = new myCart({
+//     userId,
+//     name,
+//     description,
+//     price,
+//     type
+//   });
 
+//   try {
+//     // Save the new cart item to the database
+//     const savedItem = await newCartItem.save();
+//     res.status(201).json(savedItem); // Respond with the saved item and status 201
+//   } catch (error) {
+//     console.log(error);
+//     res.status(400).json({ error: error.message }); // Respond with error message and status 400
+//   }
+// });
+
+
+
+
+app.get('/api/items/:id', async (req, res) => {
   try {
-    // Save the new cart item to the database
-    const savedItem = await newCartItem.save();
-    res.status(201).json(savedItem); // Respond with the saved item and status 201
+    const itemId = req.params.id;
+    const item = await Item.findById(itemId);
+
+    if (item) {
+      res.json(item);
+    } else {
+      res.status(404).json({ message: 'Item not found' });
+    }
   } catch (error) {
-    console.log(error);
-    res.status(400).json({ error: error.message }); // Respond with error message and status 400
+    console.error('Error fetching item:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
-
-
-
-
-
-
 
 
 
