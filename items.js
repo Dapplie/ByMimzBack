@@ -80,6 +80,7 @@ const userSchema = new mongoose.Schema({
     location: String,
     phoneNumber: String,
     password: String,
+    type: { type: String, default: 'user' }
 });
 
 const User = mongoose.model('User', userSchema);
@@ -103,7 +104,7 @@ const authenticate = (req, res, next) => {
 
 
 
-// Route to handle sign-up
+// // Route to handle sign-up
 app.post('/api/signup', async (req, res) => {
   const { fullName, email, location, phoneNumber, password } = req.body;
   try {
@@ -117,6 +118,7 @@ app.post('/api/signup', async (req, res) => {
       res.status(500).json({ message: 'Error creating user' });
   }
 });
+
 
 
 
