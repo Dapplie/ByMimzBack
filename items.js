@@ -271,29 +271,41 @@ const orderItemSchema = new mongoose.Schema({
 
 const OrderModel = mongoose.model('Order', orderItemSchema);
 app.post('/api/add_order',  async (req, res) => {
-  const { _id, userId, items } = req.body;
+  const { _id, userId } = req.body;
 
-  if (!_id || !userId || !items || !Array.isArray(items) || items.length === 0) {
+  if (!_id || !userId) {
     return res.status(400).json({ error: 'Invalid request data' });
   }
 
+  let cart;
   try {
+    // Retrieve the cart items
+    cart = await CartModel.findById(_id);
+    if (!cart) {
+      return res.status(404).json({ error: 'Cart item not found' });
+    }
+
+    // Create a new order with items from the cart
     const newOrder = new OrderModel({
       userId,
-      items
+      items: cart.items
     });
 
     await newOrder.save();
 
-    // Delete the record from CartModel
+    // After successfully saving the order, delete the cart record
     const deletedCart = await CartModel.findByIdAndDelete(_id);
     if (!deletedCart) {
-      return res.status(404).json({ error: 'Cart item not found' });
+      return res.status(404).json({ error: 'Cart item not found during deletion' });
     }
 
     res.status(201).json({ message: 'Order created successfully and cart item deleted', order: newOrder });
   } catch (error) {
-    res.status(500).json({ error: 'An error occurred while creating the order', details: error.message });
+    // In case of any error, handle it and ensure the cart is not deleted
+    if (cart) {
+      await CartModel.findByIdAndUpdate(_id, { $set: { items: cart.items } }); // Optionally restore cart items
+    }
+    res.status(500).json({ error: 'An error occurred while processing the request', details: error.message });
   }
 });
 
