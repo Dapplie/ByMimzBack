@@ -258,8 +258,44 @@ app.delete('/api/cart', authenticate, async (req, res) => {
 });
 
 
+// ORDERSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+const orderItemSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  items: [
+    {
+      itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+      quantity: { type: Number, required: true, default: 1 }
+    }
+  ]
+});
 
+const OrderModel = mongoose.model('Order', orderItemSchema);
+app.post('/api/add_order',  async (req, res) => {
+  const { _id, userId, items } = req.body;
 
+  if (!_id || !userId || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Invalid request data' });
+  }
+
+  try {
+    const newOrder = new OrderModel({
+      userId,
+      items
+    });
+
+    await newOrder.save();
+
+    // Delete the record from CartModel
+    const deletedCart = await CartModel.findByIdAndDelete(_id);
+    if (!deletedCart) {
+      return res.status(404).json({ error: 'Cart item not found' });
+    }
+
+    res.status(201).json({ message: 'Order created successfully and cart item deleted', order: newOrder });
+  } catch (error) {
+    res.status(500).json({ error: 'An error occurred while creating the order', details: error.message });
+  }
+});
 
 
 
