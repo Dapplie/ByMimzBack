@@ -84,6 +84,25 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
+
+
+
+// Middleware for authentication
+const authenticate = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+
+  jwt.verify(token, 'your_jwt_secret', (err, decoded) => {
+      if (err) return res.status(403).json({ message: 'Failed to authenticate token' });
+      
+      req.userId = decoded.id;
+      next();
+  });
+};
+
+
+
 // Route to handle sign-up
 app.post('/api/signup', async (req, res) => {
   const { fullName, email, location, phoneNumber, password } = req.body;
@@ -98,10 +117,6 @@ app.post('/api/signup', async (req, res) => {
       res.status(500).json({ message: 'Error creating user' });
   }
 });
-
-
-
-
 
 
 
@@ -124,39 +139,18 @@ app.post('/api/signin', async (req, res) => {
     }
 });
 
+// Route to fetch user info
+app.get('/api/user', authenticate, async (req, res) => {
+  try {
+      const user = await User.findById(req.userId).select('-password'); // Exclude password
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      res.json(user);
+  } catch (err) {
+      res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 
-// // cart schema and model
-// const myCartSchema = new mongoose.Schema({
-//   userId: String,
-//   name: String,
-//   description: String,
-//   price: Number,
-//   type: String,
-// });
-
-// // cart route
-// app.post('/api/add_my_Cart', async (req, res) => {
-//   const { userId, name, description, price, type } = req.body;
-
-//   // Create a new instance of the myCart model
-//   const newCartItem = new myCart({
-//     userId,
-//     name,
-//     description,
-//     price,
-//     type
-//   });
-
-//   try {
-//     // Save the new cart item to the database
-//     const savedItem = await newCartItem.save();
-//     res.status(201).json(savedItem); // Respond with the saved item and status 201
-//   } catch (error) {
-//     console.log(error);
-//     res.status(400).json({ error: error.message }); // Respond with error message and status 400
-//   }
-// });
 
 
 
