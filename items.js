@@ -154,7 +154,7 @@ app.get('/api/user', authenticate, async (req, res) => {
 
 
 
-
+//to get one item by its id
 app.get('/api/items/:id', async (req, res) => {
   try {
     const itemId = req.params.id;
@@ -170,6 +170,75 @@ app.get('/api/items/:id', async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+
+
+
+// Cart Model
+// Define Cart model inline
+const cartItemSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  items: [
+    {
+      itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+      quantity: { type: Number, required: true, default: 1 }
+    }
+  ]
+});
+
+const CartModel = mongoose.model('Cart', cartItemSchema);
+
+// Add item to cart
+app.post('/api/cart', authenticate, async (req, res) => {
+  const { itemId, quantity } = req.body;
+  try {
+    let cart = await CartModel.findOne({ userId: req.userId });
+
+    if (!cart) {
+      cart = new CartModel({ userId: req.userId, items: [{ itemId, quantity }] });
+    } else {
+      const itemIndex = cart.items.findIndex(item => item.itemId.equals(itemId));
+      if (itemIndex > -1) {
+        cart.items[itemIndex].quantity += quantity;
+      } else {
+        cart.items.push({ itemId, quantity });
+      }
+    }
+    
+    await cart.save();
+    res.status(200).json(cart);
+  } catch (err) {
+    console.error('Error adding item to cart:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get user's cart
+app.get('/api/cart', authenticate, async (req, res) => {
+  try {
+    const cart = await CartModel.findOne({ userId: req.userId })
+      .populate({
+        path: 'items.itemId',
+        select: 'name price' // Only fetch name and price
+      });
+
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
+
+    // Transform cart items to include item details
+    const cartItems = cart.items.map(item => ({
+      ...item.toObject(),
+      item: item.itemId // Add item details
+    }));
+
+    res.json({ ...cart.toObject(), items: cartItems });
+  } catch (err) {
+    console.error('Error fetching cart:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+
 
 
 
