@@ -124,22 +124,42 @@ app.post('/api/signup', async (req, res) => {
 
 
 
-// Sign-in route
+// // Sign-in route
+// app.post('/api/signin', async (req, res) => {
+//     try {
+//         const { email, password } = req.body;
+//         const user = await User.findOne({ email });
+//         if (!user) return res.status(400).json({ message: 'Invalid email or password.' });
+
+//         const isMatch = await bcrypt.compare(password, user.password);
+//         if (!isMatch) return res.status(400).json({ message: 'Invalid email or password.' });
+
+//         const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+//         res.json({ token, userId: user._id });
+//     } catch (err) {
+//         res.status(500).json({ message: err.message });
+//     }
+// });
+
 app.post('/api/signin', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ message: 'Invalid email or password.' });
+  try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(400).json({ message: 'Invalid email or password.' });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: 'Invalid email or password.' });
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) return res.status(400).json({ message: 'Invalid email or password.' });
 
-        const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
-        res.json({ token, userId: user._id });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+      const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+      res.json({ token, userId: user._id, type: user.type });
+  } catch (err) {
+      res.status(500).json({ message: err.message });
+  }
 });
+
+
+
+
 
 // Route to fetch user info
 app.get('/api/user', authenticate, async (req, res) => {
