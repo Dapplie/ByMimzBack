@@ -258,8 +258,65 @@ app.delete('/api/cart', authenticate, async (req, res) => {
 });
 
 
-// ORDERSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
-const orderItemSchema = new mongoose.Schema({
+
+// Orders Model
+
+const orderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  items: [
+    {
+      itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+      quantity: { type: Number, required: true, default: 1 }
+    }
+  ],
+  orderDate: { type: Date, default: Date.now }
+});
+
+const OrderModel = mongoose.model('Order', orderSchema);
+
+// Checkout and create order
+app.post('/api/checkout', authenticate, async (req, res) => {
+  try {
+    const cart = await CartModel.findOne({ userId: req.userId });
+
+    if (!cart) return res.status(404).json({ message: 'Cart not found' });
+
+    // Create new order
+    const newOrder = new OrderModel({
+      userId: req.userId,
+      items: cart.items
+    });
+    await newOrder.save();
+
+    // Empty the cart
+    cart.items = [];
+    await cart.save();
+
+    res.status(200).json({ message: 'Order created and cart emptied', order: newOrder });
+  } catch (err) {
+    console.error('Error during checkout:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Favorite model
+const favoriteItemSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   items: [
     {
@@ -269,45 +326,80 @@ const orderItemSchema = new mongoose.Schema({
   ]
 });
 
-const OrderModel = mongoose.model('Order', orderItemSchema);
-app.post('/api/add_order',  async (req, res) => {
-  const { _id, userId } = req.body;
+const FavoriteModel = mongoose.model('Favorite', favoriteItemSchema);
 
-  if (!_id || !userId) {
-    return res.status(400).json({ error: 'Invalid request data' });
-  }
-
-  let cart;
+// Add item to favorite
+app.post('/api/favorite', authenticate, async (req, res) => {
+  const { itemId, quantity } = req.body;
   try {
-    // Retrieve the cart items
-    cart = await CartModel.findById(_id);
-    if (!cart) {
-      return res.status(404).json({ error: 'Cart item not found' });
+    let favorite = await FavoriteModel.findOne({ userId: req.userId });
+
+    if (!favorite) {
+      favorite = new FavoriteModel({ userId: req.userId, items: [{ itemId, quantity }] });
+    } else {
+      const itemIndex = favorite.items.findIndex(item => item.itemId.equals(itemId));
+      if (itemIndex > -1) {
+        favorite.items[itemIndex].quantity += quantity;
+      } else {
+        favorite.items.push({ itemId, quantity });
+      }
     }
-
-    // Create a new order with items from the cart
-    const newOrder = new OrderModel({
-      userId,
-      items: cart.items
-    });
-
-    await newOrder.save();
-
-    // After successfully saving the order, delete the cart record
-    const deletedCart = await CartModel.findByIdAndDelete(_id);
-    if (!deletedCart) {
-      return res.status(404).json({ error: 'Cart item not found during deletion' });
-    }
-
-    res.status(201).json({ message: 'Order created successfully and cart item deleted', order: newOrder });
-  } catch (error) {
-    // In case of any error, handle it and ensure the cart is not deleted
-    if (cart) {
-      await CartModel.findByIdAndUpdate(_id, { $set: { items: cart.items } }); // Optionally restore cart items
-    }
-    res.status(500).json({ error: 'An error occurred while processing the request', details: error.message });
+    
+    await favorite.save();
+    res.status(200).json(favorite);
+  } catch (err) {
+    console.error('Error adding item to favorite:', err); // Log error
+    res.status(500).json({ message: err.message });
   }
 });
+
+// Get user's favorite
+app.get('/api/favorite', authenticate, async (req, res) => {
+  try {
+    const favorite = await FavoriteModel.findOne({ userId: req.userId })
+      .populate({
+        path: 'items.itemId',
+        select: 'name price' // Only fetch name and price
+      });
+
+    if (!favorite) return res.status(404).json({ message: 'Favorite not found' });
+
+    // Transform favorite items to include item details
+    const favoriteItems = favorite.items.map(item => ({
+      ...item.toObject(),
+      item: item.itemId // Add item details
+    }));
+
+    res.json({ ...favorite.toObject(), items: favoriteItems });
+  } catch (err) {
+    console.error('Error fetching favorite:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Remove item from fav
+app.delete('/api/favorite', authenticate, async (req, res) => {
+  const { itemId } = req.body;
+  try {
+    let favorite = await FavoriteModel.findOne({ userId: req.userId });
+
+    if (!favorite) return res.status(404).json({ message: 'Favorite not found' });
+
+    favorite.items = favorite.items.filter(item => !item.itemId.equals(itemId));
+
+    await favorite.save();
+    res.status(200).json(favorite);
+  } catch (err) {
+    console.error('Error removing item from favorite:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+
+
+
+
 
 
 
