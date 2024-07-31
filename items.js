@@ -259,7 +259,7 @@ app.delete('/api/cart', authenticate, async (req, res) => {
 
 
 
-// Orders Model
+// Orders Model FOR ORDERSSSSSSSS
 
 const orderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -301,9 +301,37 @@ app.post('/api/checkout', authenticate, async (req, res) => {
 
 
 
+// Get all orders
+app.get('/api/orders', authenticate, async (req, res) => {
+  try {
+    const orders = await OrderModel.find()
+      .populate({
+        path: 'items.itemId',
+        select: 'name price' // Only fetch name and price
+      })
+      .populate('userId', 'fullName email phoneNumber'); // Populate user information
 
+    res.status(200).json(orders);
+  } catch (err) {
+    console.error('Error fetching orders:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
 
+// Delete order
+app.delete('/api/orders/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const order = await OrderModel.findByIdAndDelete(id);
 
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    res.status(200).json({ message: 'Order deleted', order });
+  } catch (err) {
+    console.error('Error deleting order:', err); // Log error
+    res.status(500).json({ message: err.message });
+  }
+});
 
 
 
