@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const Item = require('./models/item'); // Ensure this path is correct
+const Item = require('./models/item'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
@@ -13,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
+//To connect to database
 mongoose
   .connect('mongodb+srv://ByMimzCluster:nCnMeF7PDn1T1ubl@cluster0.vvhwpeu.mongodb.net/ByMimz1?retryWrites=true&w=majority&appName=Cluster0', {
     useNewUrlParser: true,
@@ -21,6 +22,7 @@ mongoose
   .then(() => console.log('Database connected successfully.'))
   .catch((err) => console.log('Error while connecting to database:', err));
 
+  //Retrieve full items from database
 app.get('/api/items', async (req, res) => {
     console.log('Received request for /api/items');
     try {
@@ -52,7 +54,7 @@ app.delete('/api/items/:id', async (req, res) => {
 
 
 
-// Routes
+// Route to add item
 app.post('/api/items', async (req, res) => {
   try {
     const newItem = new Item(req.body);
@@ -125,21 +127,6 @@ app.post('/api/signup', async (req, res) => {
 
 
 // // Sign-in route
-// app.post('/api/signin', async (req, res) => {
-//     try {
-//         const { email, password } = req.body;
-//         const user = await User.findOne({ email });
-//         if (!user) return res.status(400).json({ message: 'Invalid email or password.' });
-
-//         const isMatch = await bcrypt.compare(password, user.password);
-//         if (!isMatch) return res.status(400).json({ message: 'Invalid email or password.' });
-
-//         const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
-//         res.json({ token, userId: user._id });
-//     } catch (err) {
-//         res.status(500).json({ message: err.message });
-//     }
-// });
 
 app.post('/api/signin', async (req, res) => {
   try {
@@ -235,7 +222,7 @@ app.post('/api/cart', authenticate, async (req, res) => {
   }
 });
 
-// Get user's cart
+// Get user's cart to view cart by user
 app.get('/api/cart', authenticate, async (req, res) => {
   try {
     const cart = await CartModel.findOne({ userId: req.userId })
@@ -279,7 +266,7 @@ app.delete('/api/cart', authenticate, async (req, res) => {
 
 
 
-// Orders Model FOR ORDERSSSSSSSS
+// Orders Model 
 
 const orderSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -425,7 +412,7 @@ app.get('/api/favorite', authenticate, async (req, res) => {
   }
 });
 
-// Remove item from fav
+// Remove item from favorite
 app.delete('/api/favorite', authenticate, async (req, res) => {
   const { itemId } = req.body;
   try {
