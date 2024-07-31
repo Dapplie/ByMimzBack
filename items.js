@@ -5,6 +5,8 @@ const Item = require('./models/item');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const port = 3030;
@@ -22,6 +24,27 @@ mongoose
   .then(() => console.log('Database connected successfully.'))
   .catch((err) => console.log('Error while connecting to database:', err));
 
+
+
+
+// Set up storage engine for multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+
+
+
   //Retrieve full items from database
 app.get('/api/items', async (req, res) => {
     console.log('Received request for /api/items');
@@ -37,6 +60,27 @@ app.get('/api/items', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+
+// Route to add item with image upload
+app.post('/api/items', upload.single('image'), async (req, res) => {
+  try {
+    const image = req.file ? req.file.path : ''; // Get the file path
+    const newItem = new Item({
+      name: req.body.name,
+      description: req.body.description,
+      price: req.body.price,
+      type: req.body.type,
+      image: image
+    });
+    await newItem.save();
+    res.status(201).json(newItem);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
 
 // Route to delete an item by ID
 app.delete('/api/items/:id', async (req, res) => {
