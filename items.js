@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
+// const process = require('./process.env');
+require('dotenv').config();
 
 const app = express();
 const port = 3030;
@@ -44,22 +46,37 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 
+//   //Retrieve full items from database original
+// app.get('/api/items', async (req, res) => {
+//     console.log('Received request for /api/items');
+//     try {
+//         const items = await Item.find();
+//         // console.log('Items fetched:', items);
+//         if (items.length === 0) {
+//             console.log('No items found in the database.');
+//         }
+//         res.json(items);
+//     } catch (err) {
+//         console.error('Error fetching items:', err);
+//         res.status(500).json({ message: err.message });
+//     }
+// });
 
-  //Retrieve full items from database
+// Retrieve full items from the database in latest first order
 app.get('/api/items', async (req, res) => {
-    console.log('Received request for /api/items');
-    try {
-        const items = await Item.find();
-        // console.log('Items fetched:', items);
-        if (items.length === 0) {
-            console.log('No items found in the database.');
-        }
-        res.json(items);
-    } catch (err) {
-        console.error('Error fetching items:', err);
-        res.status(500).json({ message: err.message });
-    }
+  console.log('Received request for /api/items');
+  try {
+      const items = await Item.find().sort({ createdAt: -1 }); // Sort by createdAt in descending order
+      if (items.length === 0) {
+          console.log('No items found in the database.');
+      }
+      res.json(items);
+  } catch (err) {
+      console.error('Error fetching items:', err);
+      res.status(500).json({ message: err.message });
+  }
 });
+
 
 // Route to add item with image upload
 app.post('/api/items', upload.single('image'), async (req, res) => {
@@ -106,6 +123,32 @@ app.post('/api/items', async (req, res) => {
     res.status(201).json(newItem);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Route to update an item's price and set onSale to true
+app.put('/api/items/:id', async (req, res) => {
+  try {
+      const updateFields = { price: req.body.price };
+
+      // If onSale is being set to true, set saleAt to the current date and time
+      if (req.body.onSale === true) {
+          updateFields.onSale = true;
+          updateFields.saleAt = new Date();
+      }
+
+      const item = await Item.findByIdAndUpdate(
+          req.params.id,
+          updateFields,
+          { new: true } // Return the updated document
+      );
+
+      if (!item) {
+          return res.status(404).json({ message: 'Item not found' });
+      }
+      res.status(200).json(item);
+  } catch (err) {
+      res.status(500).json({ message: err.message });
   }
 });
 
@@ -310,6 +353,56 @@ app.delete('/api/cart', authenticate, async (req, res) => {
 
 
 
+
+
+
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  service: 'yahoo', // or another email service
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+const sendOrderEmail = (user, order, adminEmail) => {
+  const itemsList = order.items.map(item => 
+    `<li>${item.itemId.name}: $${item.itemId.price} (Quantity: ${item.quantity})</li>`
+  ).join('');
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: adminEmail,
+    subject: 'New Order Received',
+    html: `
+      <h1>New Order</h1>
+      <p>Dear Admin,</p>
+      <p>A new order has been placed.</p>
+      <p>Order details:</p>
+      <p><strong>User Information:</strong></p>
+      <p>Name: ${user.fullName}</p>
+      <p>Email: ${user.email}</p>
+      <p>Phone: ${user.phoneNumber}</p>
+      <p><strong>Items:</strong></p>
+      <ul>${itemsList}</ul>
+      <p>Total items: ${order.items.length}</p>
+      <p>Best regards,</p>
+      <p>Your Company</p>
+    `
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
+module.exports = { sendOrderEmail };
+
+
+
+
+
+
+
 // Orders Model 
 
 const orderSchema = new mongoose.Schema({
@@ -325,10 +418,10 @@ const orderSchema = new mongoose.Schema({
 
 const OrderModel = mongoose.model('Order', orderSchema);
 
-// Checkout and create order
 app.post('/api/checkout', authenticate, async (req, res) => {
   try {
-    const cart = await CartModel.findOne({ userId: req.userId });
+    // Fetch and populate cart items
+    const cart = await CartModel.findOne({ userId: req.userId }).populate('items.itemId');
 
     if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
@@ -343,12 +436,21 @@ app.post('/api/checkout', authenticate, async (req, res) => {
     cart.items = [];
     await cart.save();
 
+    // Get user information
+    const user = await User.findById(req.userId).select('fullName email phoneNumber');
+
+    if (user) {
+      // Send email to user
+      await sendOrderEmail(user, newOrder, process.env.ADMIN_EMAIL);
+    }
+
     res.status(200).json({ message: 'Order created and cart emptied', order: newOrder });
   } catch (err) {
     console.error('Error during checkout:', err); // Log error
     res.status(500).json({ message: err.message });
   }
 });
+
 
 
 
@@ -383,6 +485,13 @@ app.delete('/api/orders/:id', authenticate, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
+
+
+
+
+
 
 
 

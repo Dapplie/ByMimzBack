@@ -6,6 +6,9 @@ const itemSchema = new mongoose.Schema({
     price: Number,
     type: String,
     image: String,
+    createdAt: { type: Date, default: Date.now }, // Example date field
+    onSale: { type: Boolean, default: false },
+    saleAt: { type: Date }, // Field to store the date when onSale becomes true
 });
 
 module.exports = mongoose.model('Item', itemSchema);
