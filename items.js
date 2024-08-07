@@ -46,21 +46,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 
-//   //Retrieve full items from database original
-// app.get('/api/items', async (req, res) => {
-//     console.log('Received request for /api/items');
-//     try {
-//         const items = await Item.find();
-//         // console.log('Items fetched:', items);
-//         if (items.length === 0) {
-//             console.log('No items found in the database.');
-//         }
-//         res.json(items);
-//     } catch (err) {
-//         console.error('Error fetching items:', err);
-//         res.status(500).json({ message: err.message });
-//     }
-// });
 
 // Retrieve full items from the database in latest first order
 app.get('/api/items', async (req, res) => {
@@ -351,7 +336,7 @@ app.get('/api/cart', authenticate, async (req, res) => {
     const cart = await CartModel.findOne({ userId: req.userId })
       .populate({
         path: 'items.itemId',
-        select: 'name price' // Only fetch name and price
+        select: 'name price image' // Fetch name, price, and image
       });
 
     if (!cart) return res.status(404).json({ message: 'Cart not found' });
@@ -359,7 +344,10 @@ app.get('/api/cart', authenticate, async (req, res) => {
     // Transform cart items to include item details
     const cartItems = cart.items.map(item => ({
       ...item.toObject(),
-      item: item.itemId // Add item details
+      item: {
+        ...item.itemId.toObject(),
+        image: `${req.protocol}://${req.get('host')}/${item.itemId.image}` // Construct the full URL for the image
+      }
     }));
 
     res.json({ ...cart.toObject(), items: cartItems });
@@ -368,6 +356,7 @@ app.get('/api/cart', authenticate, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 // Remove item from cart
 app.delete('/api/cart', authenticate, async (req, res) => {
