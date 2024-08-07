@@ -66,14 +66,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/api/items', async (req, res) => {
   console.log('Received request for /api/items');
   try {
-      const items = await Item.find().sort({ createdAt: -1 }); // Sort by createdAt in descending order
-      if (items.length === 0) {
-          console.log('No items found in the database.');
-      }
-      res.json(items);
+    const items = await Item.find().populate('type').sort({ createdAt: -1 }); // Sort by createdAt in descending order
+    if (items.length === 0) {
+      console.log('No items found in the database.');
+    }
+    res.json(items);
   } catch (err) {
-      console.error('Error fetching items:', err);
-      res.status(500).json({ message: err.message });
+    console.error('Error fetching items:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
@@ -82,20 +82,28 @@ app.get('/api/items', async (req, res) => {
 app.post('/api/items', upload.single('image'), async (req, res) => {
   try {
     const image = req.file ? req.file.path : ''; // Get the file path
+    const itemType = req.body.type; // Assume type is passed as an ObjectId
+    
+    // Ensure the itemType exists
+    const typeExists = await ItemType.findById(itemType);
+    if (!typeExists) {
+      return res.status(400).json({ message: 'Invalid item type' });
+    }
+
     const newItem = new Item({
       name: req.body.name,
       description: req.body.description,
       price: req.body.price,
-      type: req.body.type,
+      type: itemType,
       image: image
     });
+
     await newItem.save();
     res.status(201).json(newItem);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
-
 
 
 
@@ -152,6 +160,34 @@ app.put('/api/items/:id', async (req, res) => {
   }
 });
 
+
+
+const itemTypeSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+});
+
+module.exports = mongoose.model('ItemType', itemTypeSchema);
+const ItemType = mongoose.model('ItemType', itemTypeSchema);
+
+app.post('/api/item-types', async (req, res) => {
+  try {
+    const newItemType = new ItemType(req.body);
+    await newItemType.save();
+    res.status(201).json(newItemType);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+app.get('/api/item-types', async (req, res) => {
+  try {
+    const itemTypes = await ItemType.find();
+    res.json(itemTypes);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 
 
