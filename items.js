@@ -408,20 +408,22 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   }
 });
-const emails = process.env.ADMIN_EMAILS.split(',');
 
-const sendOrderEmail = (user, order, adminEmails) => {
+const adminEmails = process.env.ADMIN_EMAILS.split(','); // Static admin emails from .env file
+
+const sendOrderEmail = (user, order) => {
   const itemsList = order.items.map(item => 
     `<li>${item.itemId.name}: $${item.itemId.price} (Quantity: ${item.quantity})</li>`
   ).join('');
 
-  const mailOptions = {
+  // Email to admin
+  const adminMailOptions = {
     from: process.env.EMAIL_USER,
-    to: emails.join(', '), // join the array into a comma-separated string
+    to: adminEmails.join(', '),
     subject: 'New Order Received',
     html: `
       <h1>New Order</h1>
-      <p>Dear Admin,</p>
+      <p>Dear Admins,</p>
       <p>A new order has been placed.</p>
       <p>Order details:</p>
       <p><strong>User Information:</strong></p>
@@ -432,11 +434,32 @@ const sendOrderEmail = (user, order, adminEmails) => {
       <ul>${itemsList}</ul>
       <p>Total items: ${order.items.length}</p>
       <p>Best regards,</p>
-      <p>Your Company</p>
+      <p>ByMimz</p>
     `
   };
 
-  return transporter.sendMail(mailOptions);
+  // Email to user
+  const userMailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: 'Your Order Confirmation',
+    html: `
+      <h1>Order Confirmation</h1>
+      <p>Dear ${user.fullName},</p>
+      <p>Thank you for your order!</p>
+      <p>Order details:</p>
+      <ul>${itemsList}</ul>
+      <p>Total items: ${order.items.length}</p>
+      <p>Best regards,</p>
+      <p>ByMimz</p>
+    `
+  };
+
+  // Send email to admin and user
+  return Promise.all([
+    transporter.sendMail(adminMailOptions),
+    transporter.sendMail(userMailOptions)
+  ]);
 };
 
 module.exports = { sendOrderEmail };
@@ -484,8 +507,8 @@ app.post('/api/checkout', authenticate, async (req, res) => {
     const user = await User.findById(req.userId).select('fullName email phoneNumber');
 
     if (user) {
-      // Send email to user
-      await sendOrderEmail(user, newOrder, process.env.ADMIN_EMAIL);
+      // Send email to user and admin
+      await sendOrderEmail(user, newOrder);
     }
 
     res.status(200).json({ message: 'Order created and cart emptied', order: newOrder });
@@ -494,6 +517,7 @@ app.post('/api/checkout', authenticate, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 
 
