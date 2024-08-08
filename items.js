@@ -122,26 +122,44 @@ app.post('/api/items', async (req, res) => {
 // Route to update an item's price and set onSale to true
 app.put('/api/items/:id', async (req, res) => {
   try {
-      const updateFields = { price: req.body.price };
+    const item = await Item.findById(req.params.id);
 
-      // If onSale is being set to true, set saleAt to the current date and time
-      if (req.body.onSale === true) {
-          updateFields.onSale = true;
-          updateFields.saleAt = new Date();
-      }
+    if (!item) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
 
-      const item = await Item.findByIdAndUpdate(
-          req.params.id,
-          updateFields,
-          { new: true } // Return the updated document
-      );
+    // If oldPrice is not set, we can either skip the calculation or set it to the current price
+    if (item.oldPrice === undefined || item.oldPrice === null) {
+      item.oldPrice = item.price;
+    }
 
-      if (!item) {
-          return res.status(404).json({ message: 'Item not found' });
-      }
-      res.status(200).json(item);
+    // Store the current price in oldPrice
+    const previousPrice = item.price;
+    item.oldPrice = previousPrice;
+
+    // Update the current price
+    item.price = req.body.price;
+
+    // Calculate sale percent if both oldPrice and newPrice are available
+    if (item.oldPrice > 0 && item.price < item.oldPrice) {
+      item.salePercent = Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100);
+    } else {
+      item.salePercent = 0; // No discount or invalid prices
+    }
+
+    if (req.body.onSale === true) {
+      item.onSale = true;
+      item.saleAt = new Date();
+    } else {
+      item.onSale = false;
+      item.saleAt = null;
+    }
+
+    await item.save();
+
+    res.status(200).json(item);
   } catch (err) {
-      res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
@@ -390,15 +408,16 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   }
 });
+const emails = process.env.ADMIN_EMAILS.split(',');
 
-const sendOrderEmail = (user, order, adminEmail) => {
+const sendOrderEmail = (user, order, adminEmails) => {
   const itemsList = order.items.map(item => 
     `<li>${item.itemId.name}: $${item.itemId.price} (Quantity: ${item.quantity})</li>`
   ).join('');
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
-    to: adminEmail,
+    to: emails.join(', '), // join the array into a comma-separated string
     subject: 'New Order Received',
     html: `
       <h1>New Order</h1>
@@ -572,7 +591,7 @@ app.get('/api/favorite', authenticate, async (req, res) => {
     const favorite = await FavoriteModel.findOne({ userId: req.userId })
       .populate({
         path: 'items.itemId',
-        select: 'name price' // Only fetch name and price
+        select: 'name description price type image' // Include the image field
       });
 
     if (!favorite) return res.status(404).json({ message: 'Favorite not found' });
@@ -589,6 +608,8 @@ app.get('/api/favorite', authenticate, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
 
 // Remove item from favorite
 app.delete('/api/favorite', authenticate, async (req, res) => {
